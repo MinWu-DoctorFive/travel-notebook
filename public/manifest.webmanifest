@@ -1,0 +1,9 @@
+{
+  "id": "./", "name": "行旅手账", "short_name": "行旅手账",
+  "lang": "zh-CN", "start_url": "./", "scope": "./",
+  "display": "standalone", "background_color": "#f7f4ee", "theme_color": "#284b3c",
+  "icons": [
+    {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

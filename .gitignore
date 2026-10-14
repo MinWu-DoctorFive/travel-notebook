@@ -1,0 +1,9 @@
+node_modules/
+dist/
+outputs/
+artifacts/
+*.local
+.env*
+*.backup.json
+*.sqlite*
+.DS_Store
