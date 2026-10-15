@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {recognizeLocal,mergeRecognized} from '../src/lib/recognition';
 import {HEBEI_SEED,type TripInput} from '../src/lib/travel';
-import {parseTripDocument,parseTripInput} from '../src/lib/validation';
+import {parseTripDocument,parseTripInput,parseTripPatch} from '../src/lib/validation';
 import {redactTrip} from '../src/lib/cloud';
 import {renderPoster,releasePosters,TEMPLATES} from '../src/lib/poster';
 import {setStorageScope,listTrips,saveTrip} from '../src/lib/store';
@@ -43,3 +43,5 @@ test('return departure is never an arrival deadline, and overnight sleep does no
  const trip=normalizePlan(input,{days:[{stops:[{title:'游玩',durationMin:120},{kind:'lodging',title:'办理入住与睡眠',durationMin:480,earliestStart:'21:00'}]},{stops:[{title:'游玩',durationMin:120},{kind:'travel',title:'自驾返回石家庄',durationMin:90},{kind:'meal',title:'晚餐',durationMin:60,earliestStart:'17:30',priority:3}]}]});
  assert.equal(trip.days[0].stops.at(-1)?.durationMin,60);assert.equal(trip.days[1].stops.at(-1)?.startAt,input.returnDepartureAt);assert.equal(trip.days[1].stops.length,2);assert.equal(trip.removedForTime.length,2);assert.equal(isHomewardTravel({kind:'travel',title:'返回颐和园',place:'北京'},input),false);assert.equal(isHomewardTravel({kind:'travel',title:'返程准备：前往返程起点并等待19:00开始返程'},input),false);assert.equal(isHomewardTravel({kind:'travel',title:'乘地铁前往返程火车站'},input),false);
 });
+
+test('AI recognition accepts harmless serialization variations without inventing missing values',()=>{assert.deepEqual(parseTripPatch({origin:'石家庄',partySize:'2',budgetYuan:'500',lodging:null,departureAt:'2026-10-17 09:00:00',interests:['建筑','拍照']}),{origin:'石家庄',partySize:2,budgetYuan:500,departureAt:'2026-10-17T09:00',interests:'建筑、拍照'});assert.throws(()=>parseTripPatch({partySize:'两个人'}));assert.throws(()=>parseTripPatch({departureAt:'2026-13-17T09:00'}));});

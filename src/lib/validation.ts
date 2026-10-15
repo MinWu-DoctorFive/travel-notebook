@@ -39,7 +39,14 @@ export function parseTripInput(value:unknown):TripInput {
   const error=validateInput(result.data);if(error)throw new Error(error);return result.data;
 }
 
-export function parseTripPatch(value:unknown):Partial<TripInput> {const result=inputSchema.partial().safeParse(value);if(!result.success)throw new Error('识别结果包含无效的时间、人数或出行方式，请修改描述后重试。');return result.data;}
+export function parseTripPatch(value:unknown):Partial<TripInput> {
+  if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('识别结果不是有效的条件对象。');
+  const patch=Object.fromEntries(Object.entries(value).filter(([,v])=>v!==null&&v!==undefined));
+  for(const key of ['partySize','budgetYuan'])if(typeof patch[key]==='string'&&/^\d+(?:\.\d+)?$/.test((patch[key] as string).trim()))patch[key]=Number(patch[key]);
+  for(const key of ['interests','constraints'])if(Array.isArray(patch[key])&&(patch[key] as unknown[]).every(v=>typeof v==='string'))patch[key]=(patch[key] as string[]).join('、');
+  for(const key of ['departureAt','returnDepartureAt','arriveBy'])if(typeof patch[key]==='string')patch[key]=(patch[key] as string).trim().replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})(?::00)?$/,'$1T$2').replace(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):00$/,'$1');
+  const result=inputSchema.partial().safeParse(patch);if(!result.success)throw new Error(`识别结果中的${result.error.issues[0].path.join('.')}无效，请核对描述或手动填写。`);return result.data;
+}
 
 export function parseTripDocument(value:unknown):TripDocument {
   if (JSON.stringify(value)?.length > MAX_DOCUMENT_CHARS) throw new Error("攻略图片或内容过大，请减少照片后重试。");
