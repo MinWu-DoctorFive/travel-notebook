@@ -6,6 +6,16 @@ type AiDay={title?:string;lodgingArea?:string;stops?:AiStop[]};
 type AiPlan={title?:string;days?:AiDay[];generalTips?:string[]};
 const bounded=(v:unknown,fallback:number,min:number,max:number)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
 
+export const isHomewardTravel=(stop:{kind?:string;title?:string;place?:string},input:TripInput)=>stop.kind==='travel'&&!/(酒店|宾馆|住处|住宿)/.test(stop.title||'')&&(/(返程|回程|回家|返家)/.test(stop.title||'')||/返回/.test(stop.title||'')&&[input.origin,input.returnLocation].filter(Boolean).some(place=>`${stop.title} ${stop.place}`.includes(place!)));
+export function protectReturnDeparture(trip:TripDocument):TripDocument {
+  const last=trip.days.at(-1)!;
+  for(const stop of [...last.stops])if(isHomewardTravel(stop,trip.input)){
+    if(stop.locked||stop.completed)throw new Error('锁定交通与开始返程时间矛盾，请先核对该交通节点。');
+    last.stops.splice(last.stops.indexOf(stop),1);trip.removedForTime.push(`纠正：${stop.title}应在固定返程开始时刻之后，未纳入游玩时段。`);
+  }
+  return trip;
+}
+
 export function normalizePlan(input:TripInput,raw:unknown):TripDocument {
   const ai=raw as AiPlan;
   if(!ai||!Array.isArray(ai.days))throw new Error("模型没有返回逐日攻略。");
@@ -17,11 +27,16 @@ export function normalizePlan(input:TripInput,raw:unknown):TripDocument {
     const begin=index===0?input.departureAt:`${day.date}T${isLast&&input.returnDepartureAt.slice(11)<"09:00"?"06:00":"09:00"}`;
     const deadline=isLast?input.returnDepartureAt:`${day.date}T23:30`;
     const capacity=minutesBetween(begin,deadline);
-    const stops:TripStop[]=source.stops.slice(0,40).map(value=>{
-      const kind=(["travel","sight","meal","rest","lodging"] as string[]).includes(String(value.kind))?value.kind as StopKind:"sight";
-      return {id:crypto.randomUUID(),kind,title:String(value.title||"游玩点").slice(0,150),place:String(value.place||value.title||input.destination).slice(0,300),startAt:begin,endAt:begin,durationMin:bounded(value.durationMin,45,10,600),travelMin:bounded(value.travelMin,0,0,600),description:String(value.description||"").slice(0,3000),highlights:Array.isArray(value.highlights)?value.highlights.slice(0,12).map(v=>String(v).slice(0,300)):[],photoTip:String(value.photoTip||"").slice(0,1000),caution:String(value.caution||"").slice(0,1000),priority:bounded(value.priority,3,1,5),locked:false,sourceStatus:kind==="travel"?"estimated":"check",sourceUrl:typeof value.sourceUrl==="string"?value.sourceUrl.trim():""};
+    const candidates=source.stops.slice(0,40).filter(value=>{
+      if(isLast&&isHomewardTravel(value,input)){trip.removedForTime.push(`纠正：${String(value.title).slice(0,100)}应在固定返程开始时刻之后，未纳入游玩时段。`);return false;}
+      if(isLast&&value.earliestStart&&`${day.date}T${value.earliestStart}`>=deadline&&Number(value.priority||3)<5){trip.removedForTime.push(`移除：${String(value.title).slice(0,100)}在返程开始之后。`);return false;}
+      return true;
     });
-    const earliest=new Map(stops.map((stop,i)=>{const rawTime=source.stops![i].earliestStart;const time=typeof rawTime==="string"&&/^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime)?rawTime:stop.kind==="meal"&&/午/.test(stop.title)?"11:30":stop.kind==="meal"&&/晚/.test(stop.title)?"17:30":"";return [stop.id,time?`${day.date}T${time}`:""]}));
+    const stops:TripStop[]=candidates.map(value=>{
+      const kind=(["travel","sight","meal","rest","lodging"] as string[]).includes(String(value.kind))?value.kind as StopKind:"sight";
+      return {id:crypto.randomUUID(),kind,title:String(value.title||"游玩点").slice(0,150),place:String(value.place||value.title||input.destination).slice(0,300),startAt:begin,endAt:begin,durationMin:bounded(value.durationMin,45,10,kind==='lodging'?60:600),travelMin:bounded(value.travelMin,0,0,600),description:String(value.description||"").slice(0,3000),highlights:Array.isArray(value.highlights)?value.highlights.slice(0,12).map(v=>String(v).slice(0,300)):[],photoTip:String(value.photoTip||"").slice(0,1000),caution:String(value.caution||"").slice(0,1000),priority:bounded(value.priority,3,1,5),locked:false,sourceStatus:kind==="travel"?"estimated":"check",sourceUrl:typeof value.sourceUrl==="string"?value.sourceUrl.trim():""};
+    });
+    const earliest=new Map(stops.map((stop,i)=>{const rawTime=candidates[i].earliestStart;const time=typeof rawTime==="string"&&/^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime)?rawTime:stop.kind==="meal"&&/午/.test(stop.title)?"11:30":stop.kind==="meal"&&/晚/.test(stop.title)?"17:30":"";return [stop.id,time?`${day.date}T${time}`:""]}));
     const total=()=>{let cursor=begin;for(const stop of stops){cursor=addMinutes(cursor,stop.travelMin);const preferred=earliest.get(stop.id);if(preferred&&preferred>cursor)cursor=preferred;cursor=addMinutes(cursor,stop.durationMin);}return minutesBetween(begin,cursor);};
     // Preserve travel, meals and accommodation. Trim flexible sights/rests first.
     for(const item of [...stops].sort((a,b)=>a.priority-b.priority)){

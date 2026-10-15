@@ -6,6 +6,7 @@ import {parseTripDocument,parseTripInput} from '../src/lib/validation';
 import {redactTrip} from '../src/lib/cloud';
 import {renderPoster,releasePosters,TEMPLATES} from '../src/lib/poster';
 import {setStorageScope,listTrips,saveTrip} from '../src/lib/store';
+import {normalizePlan,isHomewardTravel} from '../src/lib/planning';
 import 'fake-indexeddb/auto';
 
 test('natural language recognizes dates and protects manually edited choices',()=>{
@@ -35,4 +36,10 @@ test('all three poster templates retain timed stops, reminders and map fallback 
   try{for(const template of TEMPLATES){drawn.length=0;const pages=await renderPoster(trip,template.id);const text=drawn.join('');assert(text.includes('计划总览'));assert(text.includes('游览顺序示意'));assert(text.includes('出行提醒'));for(const stop of trip.days[0].stops){assert(text.includes(stop.title));assert(text.includes(stop.startAt.slice(11)));}assert(pages.every(p=>p.height<12200&&p.width===1080));releasePosters(pages);}
     trip.generalTips=Array.from({length:30},(_,i)=>`提醒${i}：${'完整提醒不可遗漏。'.repeat(100)}`);const pages=await renderPoster(trip,'journal');assert(pages.length>1);assert(drawn.join('').includes('提醒29'));releasePosters(pages);
   }finally{if(original)Object.defineProperty(globalThis,'document',original);else delete (globalThis as any).document;}
+});
+
+test('return departure is never an arrival deadline, and overnight sleep does not overflow a day',()=>{
+ const input={...HEBEI_SEED.input,origin:'石家庄',returnLocation:'石家庄',departureAt:'2026-10-17T09:00',returnDepartureAt:'2026-10-18T17:00'};
+ const trip=normalizePlan(input,{days:[{stops:[{title:'游玩',durationMin:120},{kind:'lodging',title:'办理入住与睡眠',durationMin:480,earliestStart:'21:00'}]},{stops:[{title:'游玩',durationMin:120},{kind:'travel',title:'自驾返回石家庄',durationMin:90},{kind:'meal',title:'晚餐',durationMin:60,earliestStart:'17:30',priority:3}]}]});
+ assert.equal(trip.days[0].stops.at(-1)?.durationMin,60);assert.equal(trip.days[1].stops.at(-1)?.startAt,input.returnDepartureAt);assert.equal(trip.days[1].stops.length,2);assert.equal(trip.removedForTime.length,2);assert.equal(isHomewardTravel({kind:'travel',title:'返回颐和园',place:'北京'},input),false);
 });
