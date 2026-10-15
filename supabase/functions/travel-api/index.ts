@@ -1,5 +1,5 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.105.3';
-import {parseTripDocument,parseTripInput} from '../../../src/lib/validation.ts';
+import {parseTripDocument,parseTripInput,parseTripPatch} from '../../../src/lib/validation.ts';
 import {normalizePlan} from '../../../src/lib/planning.ts';
 import {HttpError,hash,secretToken,encrypt,decrypt,redact,base64ToBytes,bytesToBase64,checkedJson} from './security.ts';
 import {complete,generateImage,parseModelJson,validateConfig,publicConfig,type Config} from './providers.ts';
@@ -71,7 +71,7 @@ export async function handle(request:Request):Promise<Response>{
       let result:unknown;
       if(action==='test')result={ok:true,message:await complete(config.text,'只回复“连接成功”。','连接测试',64)};
       if(action==='parse'){
-        const content=String(body.text||'').slice(0,4000);const patch=parseModelJson(await complete(config.text,'从旅行描述提取条件，只返回 JSON 对象。未提到的字段不要填写。日期按北京时间和给定当前日期换算；不确定的日期时间不要猜测。不得把“晚上7点到家”当作开始返程。',`北京时间：${new Date(Date.now()+8*3600000).toISOString().slice(0,16)}。字段：origin,destination,departureAt(YYYY-MM-DDTHH:mm),returnDepartureAt,returnLocation,returnOrigin,arriveBy,mode(drive/transit),partySize,budgetYuan,interests,constraints,lodging,walking(easy/normal/active)。用户描述：${content}`,1200));result={patch};
+        const content=String(body.text||'').slice(0,4000);const patch=parseModelJson(await complete(config.text,'从旅行描述提取条件，只返回 JSON 对象。未提到的字段不要填写。日期按北京时间和给定当前日期换算；不确定的日期时间不要猜测。不得把“晚上7点到家”当作开始返程。',`北京时间：${new Date(Date.now()+8*3600000).toISOString().slice(0,16)}。字段：origin,destination,departureAt(YYYY-MM-DDTHH:mm),returnDepartureAt,returnLocation,returnOrigin,arriveBy,mode(drive/transit),partySize,budgetYuan,interests,constraints,lodging,walking(easy/normal/active)。用户描述：${content}`,1200));result={patch:parseTripPatch(patch)};
       }
       if(action==='image'){const destination=String(body.destination||'旅行').slice(0,300);result={image:await generateImage(config.image,`为 ${destination} 创作一幅精美旅行手账插画。暖色纸张、水彩景观、优雅构图。仅画风景，不要文字、时间、地图或虚构路线。${String(body.dayTitle||'旅行封面').slice(0,200)}`)};}
       if(action==='generate'){

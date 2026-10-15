@@ -32,7 +32,7 @@ export async function complete(endpoint:Endpoint,system:string,prompt:string,max
   const models=createModels();models.setProvider(createProvider({id:'travel-model',auth:{apiKey:{name:'API Key',resolve:async()=>({auth:{apiKey:endpoint.apiKey}})}},models:[model],api:adapters[endpoint.protocol]()}));
   let sent=false;
   try{const result=await models.complete(model,{systemPrompt:system,messages:[{role:'user',content:prompt,timestamp:Date.now()}]},{apiKey:endpoint.apiKey,maxTokens,signal:AbortSignal.timeout(110000),fetch:((url:RequestInfo|URL,init?:RequestInit)=>{sent=true;return safeFetch(url instanceof Request?url.url:String(url),init);}) as typeof fetch});
-    if(result.stopReason==='error'||result.stopReason==='aborted'){if(!sent)return await completeHttp(endpoint,system,prompt,maxTokens);throw new HttpError(502,'模型调用失败，请测试凭据、接口协议或服务商额度。');}
+    if(result.stopReason==='error'||result.stopReason==='aborted'){if(!sent)return await completeHttp(endpoint,system,prompt,maxTokens);const detail=String(result.errorMessage||'');const reason=/401|invalid_api_key|Incorrect API key/i.test(detail)?'API 凭据无效或已过期。':/403|permission/i.test(detail)?'当前凭据没有此模型权限。':/404|not found/i.test(detail)?'模型或接口地址不存在。':/429|quota|rate limit/i.test(detail)?'服务商额度不足或请求过于频繁。':/resolveDns|解析|DNS/i.test(detail)?'云端无法解析模型接口域名，请检查地址或更换兼容接口。':'模型调用失败，请核对接口协议或网络。';throw new HttpError(502,reason);}
     if(result.stopReason==='length')throw new HttpError(502,'模型回复被截断，请减少行程天数或更换输出上限更高的模型。');
     const text=result.content.filter(c=>c.type==='text').map(c=>c.type==='text'?c.text:'').join('');if(!text)throw new HttpError(502,'模型没有返回文字结果。');return text;
   }catch(error){if(error instanceof HttpError)throw error;throw new HttpError(502,'模型接口未完成请求，请核对地址、协议、权限或网络。');}

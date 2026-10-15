@@ -24,8 +24,8 @@ test('account caches and default sample never cross user boundaries',async()=>{
   setStorageScope('account-a');assert.equal((await listTrips()).length,1);setStorageScope();
 });
 test('share redaction hides private addresses, costs, notes and geographic map',()=>{
-  const trip=structuredClone(HEBEI_SEED);trip.input.origin='秘密路88号';trip.input.returnLocation='私人住宅66号';trip.days[0].stops[0].description='从秘密路88号出发';trip.actual.visitNotes='秘密笔记';trip.actual.spentYuan=999;
-  const safe=redactTrip(trip),text=JSON.stringify(safe);assert(!text.includes('秘密路88号'));assert(!text.includes('私人住宅66号'));assert(!text.includes('秘密笔记'));assert.equal(safe.input.budgetYuan,undefined);assert.equal(safe.mapDays,undefined);parseTripDocument(safe);
+  const trip=structuredClone(HEBEI_SEED);trip.input.origin='秘密路88号';trip.input.returnLocation='私人住宅66号';trip.input.returnOrigin='秘密路88号';trip.days[0].stops[0].description='从秘密路88号出发';trip.days[0].stops[1].sourceUrl='https://example.com/?q='+encodeURIComponent('秘密路88号');trip.actual.visitNotes='秘密笔记';trip.actual.spentYuan=999;
+  const safe=redactTrip(trip),text=JSON.stringify(safe);assert(!text.includes('秘密路88号'));assert(!text.includes(encodeURIComponent('秘密路88号')));assert(!text.includes('私人住宅66号'));assert(!text.includes('秘密笔记'));assert.equal(safe.input.budgetYuan,undefined);assert.equal(safe.mapDays,undefined);parseTripDocument(safe);
 });
 test('all three poster templates retain timed stops, reminders and map fallback without clipping',async()=>{
   const original=Object.getOwnPropertyDescriptor(globalThis,'document');const drawn:string[]=[];

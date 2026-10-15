@@ -39,6 +39,8 @@ export function parseTripInput(value:unknown):TripInput {
   const error=validateInput(result.data);if(error)throw new Error(error);return result.data;
 }
 
+export function parseTripPatch(value:unknown):Partial<TripInput> {const result=inputSchema.partial().safeParse(value);if(!result.success)throw new Error('识别结果包含无效的时间、人数或出行方式，请修改描述后重试。');return result.data;}
+
 export function parseTripDocument(value:unknown):TripDocument {
   if (JSON.stringify(value)?.length > MAX_DOCUMENT_CHARS) throw new Error("攻略图片或内容过大，请减少照片后重试。");
   const result=tripSchema.safeParse(value);

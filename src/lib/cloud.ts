@@ -49,8 +49,9 @@ export const cloudDelete=(id:string)=>api('delete',{id});
 export function redactTrip(trip:TripDocument):TripDocument {
   const copy=structuredClone(trip),secrets=[copy.input.origin,copy.input.returnLocation||''].filter(Boolean);
   const hide=(text:string)=>secrets.reduce((v,s)=>v.split(s).join('私人地点'),text);
+  const safeSource=(url:string)=>secrets.some(s=>url.includes(s)||url.includes(encodeURIComponent(s)))?'':url;
   copy.input.origin='出发地点已隐藏';copy.input.returnLocation='返回地点已隐藏';copy.input.budgetYuan=undefined;copy.input.constraints='';copy.input.interests='';copy.actual={visitNotes:'',photoKeys:[]};copy.mapDays=undefined;
   copy.title=hide(copy.title);copy.generalTips=copy.generalTips.map(hide);copy.removedForTime=copy.removedForTime.map(hide);
   copy.input.returnOrigin=copy.input.returnOrigin?hide(copy.input.returnOrigin):undefined;
-  copy.days=copy.days.map(day=>({...day,title:hide(day.title),lodgingArea:day.lodgingArea?hide(day.lodgingArea):undefined,stops:day.stops.map(s=>({...s,title:hide(s.title),place:hide(s.place),description:hide(s.description),highlights:s.highlights.map(hide),photoTip:hide(s.photoTip),caution:hide(s.caution),sourceUrl:s.kind==='travel'||s.kind==='return'?'':s.sourceUrl,sourceStatus:s.kind==='travel'||s.kind==='return'?'estimated':s.sourceStatus}))}));return copy;
+  copy.days=copy.days.map(day=>({...day,title:hide(day.title),lodgingArea:day.lodgingArea?hide(day.lodgingArea):undefined,stops:day.stops.map(s=>({...s,title:hide(s.title),place:hide(s.place),description:hide(s.description),highlights:s.highlights.map(hide),photoTip:hide(s.photoTip),caution:hide(s.caution),sourceUrl:s.kind==='travel'||s.kind==='return'?'':safeSource(s.sourceUrl),sourceStatus:s.kind==='travel'||s.kind==='return'?'estimated':!safeSource(s.sourceUrl)?'check':s.sourceStatus}))}));return copy;
 }
