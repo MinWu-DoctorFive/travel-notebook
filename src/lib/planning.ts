@@ -29,7 +29,8 @@ export function normalizePlan(input:TripInput,raw:unknown):TripDocument {
     const capacity=minutesBetween(begin,deadline);
     const candidates=source.stops.slice(0,40).filter(value=>{
       if(isLast&&isHomewardTravel(value,input)){trip.removedForTime.push(`纠正：${String(value.title).slice(0,100)}应在固定返程开始时刻之后，未纳入游玩时段。`);return false;}
-      if(isLast&&value.earliestStart&&`${day.date}T${value.earliestStart}`>=deadline&&Number(value.priority||3)<5){trip.removedForTime.push(`移除：${String(value.title).slice(0,100)}在返程开始之后。`);return false;}
+      const mealTime=value.kind==='meal'&&/晚/.test(value.title||'')?'17:30':value.kind==='meal'&&/午/.test(value.title||'')?'11:30':'';const earliest=value.earliestStart||mealTime;
+      if(isLast&&earliest&&`${day.date}T${earliest}`>=deadline&&Number(value.priority||3)<5){trip.removedForTime.push(`移除：${String(value.title).slice(0,100)}在返程开始之后。`);return false;}
       return true;
     });
     const stops:TripStop[]=candidates.map(value=>{
