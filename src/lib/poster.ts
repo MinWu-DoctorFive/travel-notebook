@@ -68,8 +68,10 @@ export async function renderPoster(source:TripDocument,template:Template,dayInde
   if(trip.removedForTime.length){blocks.push(titleBlock(ctx,'时间取舍',theme));trip.removedForTime.forEach(t=>blocks.push(textBlock(ctx,t,theme,27)));}
   blocks.push(textBlock(ctx,`版本时间：${new Date(trip.updatedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})}\n交通及未核实信息以出发前核对结果为准。${privacy?'分享版已隐藏私人地点与个人记录。':'私人使用版，请检查住址后再分享。'}`,{...theme,ink:theme.muted},22,400,24));
   // Cap each bitmap to avoid Safari canvas memory limits; all text continues on the next image.
-  const maxHeight=14500,groups:Block[][]=[[]];let h=PAD*2;
+  const maxHeight=14455,groups:Block[][]=[[]];let h=PAD*2;
   for(const block of blocks){if(block.height>maxHeight-PAD*2)throw new Error('单项内容过长，请缩短该项说明后再导出。');if(h+block.height>maxHeight){groups.push([]);h=PAD*2;}groups.at(-1)!.push(block);h+=block.height;}
+  // Avoid an almost empty final image containing only a footer or one reminder.
+  if(groups.length>1){const last=groups.at(-1)!,previous=groups.at(-2)!;let tail=last.reduce((n,b)=>n+b.height,0);while(tail<2400&&previous.length>1){const block=previous.at(-1)!;if(tail+block.height>maxHeight-PAD*2)break;last.unshift(previous.pop()!);tail+=block.height;}}
   const pages:PosterPage[]=[];
   for(let index=0;index<groups.length;index++){
     const group=groups[index],canvas=document.createElement('canvas');canvas.width=WIDTH;canvas.height=Math.ceil(group.reduce((n,b)=>n+b.height,0)+PAD*2+45);const c=canvas.getContext('2d');if(!c)throw new Error('图片画布初始化失败，请减少天数后重试。');

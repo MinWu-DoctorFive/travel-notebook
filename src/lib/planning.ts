@@ -6,7 +6,7 @@ type AiDay={title?:string;lodgingArea?:string;stops?:AiStop[]};
 type AiPlan={title?:string;days?:AiDay[];generalTips?:string[]};
 const bounded=(v:unknown,fallback:number,min:number,max:number)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
 
-export const isHomewardTravel=(stop:{kind?:string;title?:string;place?:string},input:TripInput)=>stop.kind==='travel'&&!/(酒店|宾馆|住处|住宿)/.test(stop.title||'')&&(/(返程|回程|回家|返家)/.test(stop.title||'')||/返回/.test(stop.title||'')&&[input.origin,input.returnLocation].filter(Boolean).some(place=>`${stop.title} ${stop.place}`.includes(place!)));
+export const isHomewardTravel=(stop:{kind?:string;title?:string;place?:string},input:TripInput)=>stop.kind==='travel'&&!/(酒店|宾馆|住处|住宿|返程前|返程准备|前往.*(?:站|机场|起点|枢纽)|返程起点|返程站)/.test(stop.title||'')&&(/(返程|回程|回家|返家)/.test(stop.title||'')||/返回/.test(stop.title||'')&&[input.origin,input.returnLocation].filter(Boolean).some(place=>`${stop.title} ${stop.place}`.includes(place!)));
 export function protectReturnDeparture(trip:TripDocument):TripDocument {
   const last=trip.days.at(-1)!;
   for(const stop of [...last.stops])if(isHomewardTravel(stop,trip.input)){
