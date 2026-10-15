@@ -12,6 +12,11 @@ export type TripInput = {
   budgetYuan?: number;
   interests: string;
   constraints: string;
+  returnLocation?: string;
+  returnOrigin?: string;
+  arriveBy?: string;
+  lodging?: string;
+  walking?: "easy" | "normal" | "active";
 };
 
 export type TripStop = {
@@ -31,6 +36,7 @@ export type TripStop = {
   sourceUrl: string;
   locked: boolean;
   priority: number;
+  completed?: boolean;
 };
 
 export type TripDay = {
@@ -61,6 +67,8 @@ export type TripDocument = {
   actual: ActualRecord;
   createdAt: string;
   updatedAt: string;
+  template?: "practical" | "journal" | "share";
+  mapDays?: Record<string, { image?: string; points: { id: string; name: string; location: string }[]; checkedAt: string; warnings: string[] }>;
 };
 
 export function chinaDate(value: string): Date {
@@ -87,6 +95,7 @@ export function validateInput(value: TripInput): string | null {
   const end = chinaDate(value.returnDepartureAt);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "请填写有效的出发和返程时间。";
   if (end <= start) return "返程出发时间应晚于出发时间。";
+  if (value.arriveBy && (Number.isNaN(chinaDate(value.arriveBy).getTime()) || chinaDate(value.arriveBy) <= end)) return "最晚到达时间应晚于开始返程时间。";
   if (Date.parse(value.returnDepartureAt.slice(0,10))-Date.parse(value.departureAt.slice(0,10)) >= 14 * 86_400_000) return "单次攻略最多规划 14 个自然日。";
   if (value.budgetYuan !== undefined && (!Number.isFinite(value.budgetYuan) || value.budgetYuan < 0)) return "预算不能为负数。";
   return null;
@@ -101,7 +110,7 @@ export function newBlankTrip(input: TripInput): TripDocument {
     title: `${input.destination}游玩攻略`,
     input,
     status: "planned",
-    days: dates.map((date,i)=>({ date, title: `第${i+1}天`, stops: i===dates.length-1?[seedStop(crypto.randomUUID(),"return","开始返程",input.origin,input.returnDepartureAt,input.returnDepartureAt,"按指定时间从目的地出发。",[])]:[] })),
+    days: dates.map((date,i)=>({ date, title: `第${i+1}天`, stops: i===dates.length-1?[seedStop(crypto.randomUUID(),"return","开始返程",input.returnLocation||input.origin,input.returnDepartureAt,input.returnDepartureAt,"按指定时间从目的地出发。",[])]:[] })),
     generalTips: ["出行前请核对目的地开放安排和天气。"],
     removedForTime: [],
     actual: { visitNotes: "", photoKeys: [] },

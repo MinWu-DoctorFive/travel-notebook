@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { chinaDate, formatLocal, minutesBetween, validateInput, type TripDocument, type TripInput } from "./travel";
+import { chinaDate, formatLocal, minutesBetween, validateInput, type TripDocument, type TripInput } from "./travel.ts";
 
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(v => Number.isFinite(chinaDate(v).getTime()) && formatLocal(chinaDate(v))===v, "时间无效");
 const text = (max:number) => z.string().max(max);
@@ -10,8 +10,9 @@ const stopSchema = z.object({
   durationMin:z.number().finite().min(0).max(1440),travelMin:z.number().finite().min(0).max(720),
   description:text(3000),highlights:z.array(text(300)).max(20),photoTip:text(1000),caution:text(1000),
   sourceStatus:z.enum(["sourced","estimated","check"]),sourceUrl:link,locked:z.boolean(),priority:z.number().int().min(1).max(5),
+  completed:z.boolean().optional(),
 });
-const inputSchema=z.object({origin:text(300).min(1),destination:text(300).min(1),departureAt:dateTime,returnDepartureAt:dateTime,mode:z.enum(["drive","transit"]),partySize:z.number().int().min(1).max(20),budgetYuan:z.number().finite().min(0).optional(),interests:text(1500),constraints:text(1500)});
+const inputSchema=z.object({origin:text(300).min(1),destination:text(300).min(1),departureAt:dateTime,returnDepartureAt:dateTime,mode:z.enum(["drive","transit"]),partySize:z.number().int().min(1).max(20),budgetYuan:z.number().finite().min(0).optional(),interests:text(1500),constraints:text(1500),returnLocation:text(300).optional(),returnOrigin:text(300).optional(),arriveBy:dateTime.or(z.literal("")).optional(),lodging:text(1000).optional(),walking:z.enum(["easy","normal","active"]).optional()});
 export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_DOCUMENT_CHARS = 64 * 1024 * 1024;
 export function isSafeImageUrl(value: string): boolean {
@@ -29,6 +30,8 @@ const tripSchema=z.object({
   generalTips:z.array(text(1500)).max(30),coverUrl:imageUrl.optional(),removedForTime:z.array(text(200)).max(100),
   actual:z.object({visitNotes:text(10000),spentYuan:z.number().finite().min(0).optional(),actualDepartureAt:dateTime.or(z.literal("")).optional(),actualReturnAt:dateTime.or(z.literal("")).optional(),photoKeys:z.array(photoKey).max(12)}),
   createdAt:text(100),updatedAt:text(100),
+  template:z.enum(["practical","journal","share"]).optional(),
+  mapDays:z.record(z.object({image:imageUrl.optional(),points:z.array(z.object({id:text(100),name:text(300),location:z.string().regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/)})).max(60),checkedAt:text(100),warnings:z.array(text(1000)).max(30)})).optional(),
 });
 
 export function parseTripInput(value:unknown):TripInput {

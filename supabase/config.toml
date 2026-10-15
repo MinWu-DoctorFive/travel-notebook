@@ -1,0 +1,6 @@
+project_id = "travel-notebook"
+
+[functions.travel-api]
+verify_jwt = false
+# The handler verifies user JWTs with auth.getUser on every private action.
+# Health, one-use invitation registration, and sanitized shares are public actions.

@@ -1,0 +1,11 @@
+import {encrypt,decrypt,isPrivateIp,validateEndpoint,redact} from './security.ts';
+import {complete,validateConfig} from './providers.ts';
+const assert=(value:unknown,message='assertion failed')=>{if(!value)throw new Error(message);};
+Deno.test('AES-GCM binds credentials to one account and detects tampering',async()=>{const key=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));const value=await encrypt({apiKey:'private-test-key'},key,'a');assert((await decrypt(value,key,'a')).apiKey==='private-test-key');let denied=false;try{await decrypt(value,key,'b');}catch{denied=true;}assert(denied);assert(!value.includes('private-test-key'));});
+Deno.test('model endpoints reject private, credential-bearing and insecure URLs',()=>{for(const value of ['http://api.example.com','https://127.0.0.1','https://localhost','https://user:pass@example.com','https://api.example.com/?key=secret']){let denied=false;try{validateEndpoint(value);}catch{denied=true;}assert(denied,value);}for(const ip of ['127.0.0.1','10.1.2.3','192.168.1.1','169.254.169.254','::1','::ffff:127.0.0.1','fc00::1'])assert(isPrivateIp(ip));assert(!isPrivateIp('8.8.8.8'));});
+Deno.test('pi AI executes OpenAI-compatible stream transport in Deno',async()=>{
+  const originalFetch=globalThis.fetch,originalDns=Deno.resolveDns;let called=false;
+  Deno.resolveDns=(async()=>['8.8.8.8']) as unknown as typeof Deno.resolveDns;
+  globalThis.fetch=async(input,options)=>{const url=String(input);assert(url==='https://api.model-test.example/v1/chat/completions');const payload=JSON.parse(String(options?.body));assert(payload.model==='controlled-test-model');assert(payload.stream===true);called=true;const chunk=(delta:any,finish_reason:any=null)=>`data: ${JSON.stringify({id:'mock',object:'chat.completion.chunk',created:1,model:'controlled-test-model',choices:[{index:0,delta,finish_reason}]})}\n\n`;return new Response(chunk({role:'assistant',content:'{"ok":true}'})+chunk({},'stop')+'data: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});};
+  try{const result=await complete({provider:'test',protocol:'openai-completions',baseUrl:'https://api.model-test.example/v1',model:'controlled-test-model',apiKey:'not-a-real-credential'},'Return JSON','Test',64);assert(result==='{"ok":true}');assert(called);}finally{globalThis.fetch=originalFetch;Deno.resolveDns=originalDns;}
+});

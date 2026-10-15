@@ -114,7 +114,7 @@ export default function TripDetail({ trip, revisions, onSave, onBack, onImportRe
       const next = structuredClone(trip); next.title = metadata.title.trim(); next.status = metadata.status; next.input = structuredClone(metadata.input); next.generalTips = lines(metadata.tips);
       next.days.forEach((day, index) => {
         day.title = metadata.days[index].title.trim(); day.lodgingArea = index === next.days.length - 1 ? undefined : metadata.days[index].lodgingArea.trim() || undefined;
-        for (const stop of day.stops) if (stop.kind === "return") Object.assign(stop, { startAt: next.input.returnDepartureAt, endAt: next.input.returnDepartureAt, durationMin: 0, travelMin: 0, locked: true, priority: 5, place: next.input.origin });
+        for (const stop of day.stops) if (stop.kind === "return") Object.assign(stop, { startAt: next.input.returnDepartureAt, endAt: next.input.returnDepartureAt, durationMin: 0, travelMin: 0, locked: true, priority: 5, place: next.input.returnLocation || next.input.origin });
       });
       await persist(next, "trip-info");
     } catch (error) { setMetadataError(error instanceof Error ? error.message : "保存失败，请检查时间与游玩安排。"); }
@@ -129,7 +129,7 @@ export default function TripDetail({ trip, revisions, onSave, onBack, onImportRe
       if (purpose === "cover") next.coverUrl = url;
       else next.actual = { ...actual, photoKeys: [...actual.photoKeys, url] };
       await onSave(next, purpose === "cover" ? "cover" : "actual-photo");
-      notify(purpose === "cover" ? "封面已保存在本机。" : "照片与记录已保存在本机。建议定期导出备份。");
+      notify(purpose === "cover" ? "封面已保存。" : "照片与记录已保存。建议定期导出备份。");
     } catch (error) { notify(error instanceof Error ? error.message : "图片未保存，请重试。"); }
     finally { setBusy(false); }
   }
@@ -184,7 +184,7 @@ export default function TripDetail({ trip, revisions, onSave, onBack, onImportRe
         {metadataError && <p className="error-box" role="alert">{metadataError}</p>}
         <div className="form-actions"><button type="button" className="button-primary" disabled={busy || !metadata.title.trim()} onClick={() => { void saveMetadata(); }}>保存行程信息</button></div>
         <label className="photo-upload">选择本机图片作为封面<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => { void upload(event, "cover"); }} /></label>
-        <p className="form-note">JPG、PNG 或 WebP，单张不超过 3 MB。自选封面与本机照片不会上传服务器。</p>
+        <p className="form-note">JPG、PNG 或 WebP，单张不超过 3 MB。登录私人空间后，封面与照片会保存到你的私人云端。</p>
         {trip.coverUrl && <button type="button" className="button-plain" disabled={busy} onClick={() => { const next = structuredClone(trip); delete next.coverUrl; saveQuietly(next, "remove-cover"); }}>移除封面</button>}
       </details>
 
@@ -208,7 +208,7 @@ export default function TripDetail({ trip, revisions, onSave, onBack, onImportRe
       </section>)}
       <section className="notes-section"><h2>出行提醒</h2>{trip.generalTips.length ? trip.generalTips.map((value, index) => <p key={index}>✳ {value}</p>) : <p>可在行程信息里补充提醒。</p>}</section>
 
-      <section className="work-section"><h2>途中改计划</h2><p>写下变化，复制到你常用的 AI 对话中生成调整方案，再把返回的完整 JSON 粘贴回来。导入后先看差异，确认才保存。</p>
+      <section className="work-section legacy-ai-import"><h2>途中改计划</h2><p>写下变化，复制到你常用的 AI 对话中生成调整方案，再把返回的完整 JSON 粘贴回来。导入后先看差异，确认才保存。</p>
         <label>发生了什么变化<textarea value={change} maxLength={1500} onChange={event => setChange(event.target.value)} placeholder="例如：晚出发一小时，保留城堡湖畔，仍在原定时刻开始返程" /></label>
         <button type="button" className="button-primary" disabled={busy || change.trim().length < 2} onClick={() => { void copyPrompt(); }}>复制调整提示词</button>
         {prompt && <details><summary>查看或手动复制提示词</summary><textarea readOnly value={prompt} rows={9} onFocus={event => event.target.select()} aria-label="调整提示词" /></details>}

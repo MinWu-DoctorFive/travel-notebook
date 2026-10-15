@@ -24,12 +24,13 @@ function preserveCurrent(proposed: TripDocument, current: TripDocument, allowRet
   const next = structuredClone(proposed);
   next.id = current.id;
   next.createdAt = current.createdAt;
+  next.updatedAt = current.updatedAt;
   next.status = current.status;
   next.actual = structuredClone(current.actual);
   next.coverUrl ||= current.coverUrl;
   for (const oldDay of current.days) {
     const day = next.days.find(item => item.date === oldDay.date);
-    const locked = oldDay.stops.filter(stop => stop.locked && !(allowReturnChange && stop.kind === "return"));
+    const locked = oldDay.stops.filter(stop => (stop.locked || stop.completed) && !(allowReturnChange && stop.kind === "return"));
     if (!day && locked.length) throw new Error("修改后的日期遗漏了锁定项目，请保留或先解锁。");
     if (!day) continue;
     day.imageUrl ||= oldDay.imageUrl;
@@ -40,6 +41,8 @@ function preserveCurrent(proposed: TripDocument, current: TripDocument, allowRet
       day.stops[index] = structuredClone(stop);
     }
   }
+  if(JSON.stringify(next.days.map(d=>d.stops.map(s=>s.place)))===JSON.stringify(current.days.map(d=>d.stops.map(s=>s.place)))) next.mapDays=current.mapDays;
+  next.template=current.template;
   return parseTripDocument(next);
 }
 

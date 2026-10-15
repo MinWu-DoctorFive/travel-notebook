@@ -3,7 +3,7 @@ import test from "node:test";
 import { JSDOM } from "jsdom";
 import "fake-indexeddb/auto";
 
-test("mobile workflow saves only confirmed imports and exports restorable JSON", { timeout: 30_000 }, async () => {
+test("legacy manual import keeps confirmation and restorable backups", { timeout: 30_000 }, async () => {
   const dom = new JSDOM("<!doctype html><html><body><div id='root'></div></body></html>", {
     url: "https://travel.example/#/new", pretendToBeVisual: true,
   });
@@ -42,7 +42,7 @@ test("mobile workflow saves only confirmed imports and exports restorable JSON",
 
   const { act, createElement } = await import("react");
   const { createRoot } = await import("react-dom/client");
-  const { default: App } = await import("../src/App");
+  const { default: App } = await import("../src/Legacy");
   const { listTrips, getTrip } = await import("../src/lib/store");
   const root = createRoot(dom.window.document.getElementById("root")!);
   const tick = () => new Promise<void>(resolve => setTimeout(resolve, 15));
@@ -96,7 +96,7 @@ test("mobile workflow saves only confirmed imports and exports restorable JSON",
     await click(button("校验并预览攻略"));
     assert.match(dom.window.document.body.textContent || "", /确认这份攻略/);
     assert.equal((await listTrips()).length, 1, "preview must not write a trip");
-    await click(button("确认并保存在本机"));
+    await click(button("确认保存新版本"));
     await settle();
     let trip = (await listTrips()).find(item => item.title === "北京城中漫步");
     assert(trip, "confirmed trip should exist");
@@ -111,7 +111,7 @@ test("mobile workflow saves only confirmed imports and exports restorable JSON",
     await click(button("预览调整差异"));
     assert.match(dom.window.document.body.textContent || "", /北京城中慢游/);
     assert.equal((await getTrip(trip.id))?.trip.title, "北京城中漫步", "replan preview must not overwrite saved trip");
-    await click(button("确认并保存在本机"));
+    await click(button("确认保存新版本"));
     await settle();
     trip = (await getTrip(trip.id))?.trip;
     assert.equal(trip?.title, "北京城中慢游");

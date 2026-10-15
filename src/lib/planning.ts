@@ -1,5 +1,5 @@
-import { addMinutes, newBlankTrip, minutesBetween, type StopKind, type TripDocument, type TripInput, type TripStop } from "./travel";
-import { parseTripDocument } from "./validation";
+import { addMinutes, newBlankTrip, minutesBetween, type StopKind, type TripDocument, type TripInput, type TripStop } from "./travel.ts";
+import { parseTripDocument } from "./validation.ts";
 
 type AiStop={kind?:string;title?:string;place?:string;durationMin?:number;travelMin?:number;description?:string;highlights?:string[];photoTip?:string;caution?:string;priority?:number;sourceUrl?:string;earliestStart?:string};
 type AiDay={title?:string;lodgingArea?:string;stops?:AiStop[]};
@@ -33,7 +33,7 @@ export function normalizePlan(input:TripInput,raw:unknown):TripDocument {
     }
     while(total()>capacity){const candidates=stops.filter(s=>s.priority<5&&["sight","rest"].includes(s.kind)).sort((a,b)=>a.priority-b.priority);const item=candidates[0];if(!item)throw new Error("必去看点与必要交通无法在指定时段内完成，请延长时间或减少目的地。");stops.splice(stops.indexOf(item),1);trip.removedForTime.push(`移除：${item.title}`);}
     let cursor=begin;for(const stop of stops){cursor=addMinutes(cursor,stop.travelMin);const preferred=earliest.get(stop.id);if(preferred&&preferred>cursor)cursor=preferred;stop.startAt=cursor;cursor=addMinutes(cursor,stop.durationMin);stop.endAt=cursor;}
-    if(isLast)stops.push({id:crypto.randomUUID(),kind:"return",title:"开始返程",place:input.origin,startAt:input.returnDepartureAt,endAt:input.returnDepartureAt,durationMin:0,travelMin:0,description:"按指定时刻从目的地出发。出发前在高德核对当前路线或换乘安排。",highlights:[],photoTip:"",caution:"",sourceStatus:"estimated",sourceUrl:"",locked:true,priority:5});
+    if(isLast)stops.push({id:crypto.randomUUID(),kind:"return",title:"开始返程",place:input.returnLocation||input.origin,startAt:input.returnDepartureAt,endAt:input.returnDepartureAt,durationMin:0,travelMin:0,description:"按指定时刻从目的地出发。出发前在高德核对当前路线或换乘安排。",highlights:[],photoTip:"",caution:"",sourceStatus:"estimated",sourceUrl:"",locked:true,priority:5});
     return {...day,title:String(source.title||day.title).slice(0,200),lodgingArea:isLast?undefined:String(source.lodgingArea||"建议选择次日首站附近、便于公共交通到达的住宿区域，预订前核对评价与退改规则。").slice(0,1000),stops};
   });
   trip.generalTips=Array.isArray(ai.generalTips)?ai.generalTips.slice(0,25).map(t=>String(t).slice(0,1500)):[];

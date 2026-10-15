@@ -9,7 +9,8 @@ export type ImportResult = { imported: number; ids: string[] };
 
 export const BACKUP_SCHEMA_VERSION = 2;
 const DB_SCHEMA_VERSION = 1;
-const DB_NAME = "travel-pages";
+let DB_NAME = "travel-pages";
+export function setStorageScope(userId?: string): void { DB_NAME = userId ? `travel-private-${userId.replace(/[^a-zA-Z0-9-]/g, '')}` : "travel-pages"; }
 const STORE = "trips";
 const META = "meta";
 const MAX_REVISIONS = 40;
@@ -31,7 +32,7 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE)) {
         const store = db.createObjectStore(STORE, { keyPath: "id" });
         const seed = structuredClone(HEBEI_SEED);
-        store.put({ id: seed.id, trip: seed, revisions: [{
+        if(DB_NAME === "travel-pages") store.put({ id: seed.id, trip: seed, revisions: [{
           id: crypto.randomUUID(), kind: "historical-example", createdAt: seed.createdAt, document: structuredClone(seed),
         }] });
       }
@@ -90,12 +91,17 @@ export function parseJsonText(text: string): unknown {
   catch { throw new Error("JSON 格式无效，请复制完整攻略或备份内容。"); }
 }
 
-async function listRecords(): Promise<TripRecord[]> {
+export async function listRecords(): Promise<TripRecord[]> {
   return withDb(async db => {
     const tx = db.transaction(STORE, "readonly");
     const values = await readRequest<StoredRecord[]>(tx.objectStore(STORE).getAll(), tx);
     return values.map(copyRecord).sort((a, b) => b.trip.updatedAt.localeCompare(a.trip.updatedAt));
   });
+}
+
+export async function cacheRecord(record: TripRecord): Promise<void> {
+  const checked = validateRecord(record);
+  return withDb(db => new Promise((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put({id:checked.trip.id,...checked});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(storageError(tx.error));tx.onabort=()=>reject(storageError(tx.error));}));
 }
 
 export async function listTrips(): Promise<TripDocument[]> {

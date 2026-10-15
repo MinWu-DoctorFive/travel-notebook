@@ -10,16 +10,20 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
     "lucide-react": "1.31.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "^1.2.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "deno": "^2.9.6",
     "fake-indexeddb": "6.2.4",
     "jsdom": "30.1.2",
+    "supabase": "2.121.0",
     "tsx": "4.20.6",
     "typescript": "5.9.3",
     "vite": "8.3.4"
