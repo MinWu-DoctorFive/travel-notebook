@@ -2,7 +2,7 @@ import {createClient} from 'npm:@supabase/supabase-js@2.105.3';
 import {parseTripDocument,parseTripInput,parseTripPatch} from '../../../src/lib/validation.ts';
 import {normalizePlan} from '../../../src/lib/planning.ts';
 import {HttpError,hash,secretToken,encrypt,decrypt,redact,base64ToBytes,bytesToBase64,checkedJson} from './security.ts';
-import {complete,generateImage,parseModelJson,validateConfig,publicConfig,type Config} from './providers.ts';
+import {complete,generateImage,parseModelJson,validateConfig,publicConfig,requireEndpoint,listModels,completeDeepSeekPreset,type Config} from './providers.ts';
 import {makeMap} from './maps.ts';
 
 const rootKey=Deno.env.get('TRAVEL_ENCRYPTION_KEY')||'';
@@ -55,6 +55,11 @@ export async function handle(request:Request):Promise<Response>{
       if(raw.amapKey===undefined)raw.amapKey=prior?.amapKey;if(raw.searchKey===undefined)raw.searchKey=prior?.searchKey;
       const config=validateConfig(raw),encrypted=await encrypt(config,rootKey,user);const {error}=await admin.from('travel_models').upsert({user_id:user,encrypted,updated_at:new Date().toISOString()});dbError(error);return json(publicConfig(config));
     }
+    if(action==='deepseekPreset'){
+      const prior=await configFor(user);if(!prior)throw new HttpError(400,'请先保存 API Key。');
+      const config=completeDeepSeekPreset(prior);const {error}=await admin.from('travel_models').update({encrypted:await encrypt(config,rootKey,user),updated_at:new Date().toISOString()}).eq('user_id',user);dbError(error);return json(publicConfig(config));
+    }
+    if(action==='models'){const config=await configFor(user);if(!config)throw new HttpError(400,'请先保存模型配置。');return json(await listModels(config.text));}
     if(action==='invite'){
       if(!member.is_owner)throw new HttpError(403,'只有工作台所有者可以邀请注册。');const email=String(body.email||'').toLowerCase().trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new HttpError(400,'请填写受邀者邮箱。');const token=secretToken();const {error}=await admin.from('travel_invites').insert({token_hash:await hash(token),email,is_owner:false,created_by:user,expires_at:new Date(Date.now()+7*86400000).toISOString()});dbError(error);return json({token});
     }
@@ -64,6 +69,9 @@ export async function handle(request:Request):Promise<Response>{
     if(action==='map'){const config=await configFor(user);if(!config?.amapKey)throw new HttpError(400,'请先在模型配置中保存高德 Web 服务 Key。');const trip=parseTripDocument(body.trip),day=trip.days[Number(body.day)];if(!day)throw new HttpError(400,'日期不存在。');return json(await makeMap(config.amapKey,day,trip.input.mode,body.overrides||{}));}
     if(!['parse','generate','test','image'].includes(action))throw new HttpError(400,'操作不存在。');
     const config=await configFor(user);if(!config)throw new HttpError(400,'请先在“我的”保存模型配置。');
+    requireEndpoint(action==='image'?config.image:config.text,action==='image'?'图片':'文字');
+    if(action==='generate'){parseTripInput(body.input);if(body.current)parseTripDocument(body.current);}
+    if(action==='parse'&&!String(body.text||'').trim())throw new HttpError(400,'请先输入旅行描述。');
     if(!/^[a-f0-9-]{36}$/i.test(body.requestId||''))throw new HttpError(400,'请求编号无效。');
     const {data:reserved,error:reserveError}=await admin.rpc('travel_reserve',{p_user:user,p_id:body.requestId,p_action:action,p_amount:action==='image'?config.imageReserveYuan:config.requestReserveYuan,p_limit:config.monthlyBudgetYuan});dbError(reserveError);
     if(!reserved){const {data}=await admin.from('travel_requests').select('status,result,action').eq('user_id',user).eq('id',body.requestId).single();if(data?.action!==action)throw new HttpError(409,'请求编号不能用于另一项操作。');if(data?.status==='done')return json(await loadImages(data.result,user));throw new HttpError(409,'该请求正在处理或已失败，请检查结果后再重试。');}

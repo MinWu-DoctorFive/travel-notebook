@@ -7,6 +7,26 @@ import type { Model,Api } from 'npm:@earendil-works/pi-ai@1.2.0';
 import { checkedJson,HttpError,safeFetch,validateEndpoint,bytesToBase64 } from './security.ts';
 export type Endpoint={provider:string;protocol:'openai-completions'|'openai-responses'|'anthropic-messages'|'google-generative-ai';baseUrl:string;model:string;apiKey?:string};
 export type Config={text:Endpoint;image:Endpoint;monthlyBudgetYuan:number;requestReserveYuan:number;imageReserveYuan:number;amapKey?:string;searchKey?:string};
+export function requireEndpoint(endpoint:Endpoint,kind='文字',requireModel=true){
+  const missing=[!endpoint.baseUrl&&'接口地址',requireModel&&!endpoint.model.trim()&&'模型名称',!endpoint.apiKey&&'API Key'].filter(Boolean);
+  if(missing.length)throw new HttpError(400,`${kind}模型缺少${missing.join('、')}，请在“我的 → 模型配置”补齐并保存。此次未预留预算。`);
+  validateEndpoint(endpoint.baseUrl);
+}
+export function completeDeepSeekPreset(config:Config):Config {
+  const next=structuredClone(config);
+  if(next.text.baseUrl&&!/^https:\/\/api\.deepseek\.com(?:\/v1)?\/?$/.test(next.text.baseUrl))throw new HttpError(400,'已有接口属于其他地址，请选择 DeepSeek 并重新填写其 Key。');
+  next.text={...next.text,provider:'DeepSeek',protocol:'openai-completions',baseUrl:'https://api.deepseek.com',model:'deepseek-flash'};
+  requireEndpoint(next.text);return next;
+}
+export async function listModels(endpoint:Endpoint){
+  requireEndpoint(endpoint,'文字',false);
+  const headers:Record<string,string>={};
+  if(endpoint.protocol==='anthropic-messages'){headers['x-api-key']=endpoint.apiKey!;headers['anthropic-version']='2023-06-01';}
+  else if(endpoint.protocol==='google-generative-ai')headers['x-goog-api-key']=endpoint.apiKey!;
+  else headers.Authorization=`Bearer ${endpoint.apiKey}`;
+  const data=await checkedJson(await safeFetch(`${endpoint.baseUrl}/models`,{headers,signal:AbortSignal.timeout(20000)}));
+  return {models:(data.data||data.models||[]).map((m:any)=>({id:String(m.id||m.name||'').replace(/^models\//,''),name:String(m.displayName||m.name||m.id||'')})).filter((m:any)=>m.id&&m.id.length<=150).slice(0,500)};
+}
 export function validateConfig(raw:any):Config {
   const endpoint=(value:any):Endpoint=>{if(!value||!['openai-completions','openai-responses','anthropic-messages','google-generative-ai'].includes(value.protocol))throw new HttpError(400,'请选择支持的模型接口协议。');if(value.baseUrl)validateEndpoint(value.baseUrl);if(String(value.model||'').length>150||String(value.apiKey||'').length>2000)throw new HttpError(400,'模型名称或密钥过长。');return {provider:String(value.provider||'兼容接口').slice(0,100),protocol:value.protocol,baseUrl:String(value.baseUrl||'').replace(/\/+$/,''),model:String(value.model||''),apiKey:value.apiKey};};
   for(const name of ['monthlyBudgetYuan','requestReserveYuan','imageReserveYuan'])if(!Number.isFinite(raw[name])||raw[name]<0||raw[name]>10000)throw new HttpError(400,'请填写有效的预算与请求预留金额。');
@@ -25,7 +45,7 @@ async function completeHttp(endpoint:Endpoint,system:string,prompt:string,maxTok
   if(typeof result!=='string'||!result)throw new HttpError(502,'模型没有返回文字结果。');return result;
 }
 export async function complete(endpoint:Endpoint,system:string,prompt:string,maxTokens=6500){
-  if(!endpoint.apiKey||!endpoint.model||!endpoint.baseUrl)throw new HttpError(400,'请先保存文字模型、接口地址和 API Key。');
+  requireEndpoint(endpoint);
   validateEndpoint(endpoint.baseUrl);
   const adapters={'openai-completions':openAICompletionsApi,'openai-responses':openAIResponsesApi,'anthropic-messages':anthropicMessagesApi,'google-generative-ai':googleGenerativeAIApi};
   const model:Model<Api>={id:endpoint.model,name:endpoint.model,api:endpoint.protocol,provider:'travel-model',baseUrl:endpoint.baseUrl,reasoning:false,input:['text'],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:64000,maxTokens,compat:endpoint.protocol==='openai-completions'?{supportsDeveloperRole:false,supportsReasoningEffort:false}:undefined};

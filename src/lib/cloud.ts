@@ -6,6 +6,7 @@ import project from '../cloud-project.json';
 export type Connection = { url: string; key: string };
 export type ModelEndpoint = { provider: string; protocol: 'openai-completions' | 'openai-responses' | 'anthropic-messages' | 'google-generative-ai'; baseUrl: string; model: string; apiKey?: string; hasKey?: boolean };
 export type ModelConfig = { text: ModelEndpoint; image: ModelEndpoint; monthlyBudgetYuan: number; requestReserveYuan: number; imageReserveYuan: number; amapKey?: string; hasAmapKey?: boolean; searchKey?: string; hasSearchKey?: boolean };
+export const endpointReady=(endpoint?:ModelEndpoint)=>!!(endpoint?.hasKey&&endpoint.baseUrl.trim()&&endpoint.model.trim());
 export const DEFAULT_CONFIG: ModelConfig = {
   text:{provider:'兼容接口',protocol:'openai-completions',baseUrl:'',model:''},
   image:{provider:'兼容接口',protocol:'openai-completions',baseUrl:'',model:''},
